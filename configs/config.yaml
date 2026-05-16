@@ -1,0 +1,47 @@
+data:
+  bj_path: data/dataset_BJ.csv
+  data_dir: data
+  zj_path: data/dataset_ZJ.csv
+
+model:
+  max_seq_len: 200
+  num_channels:
+  - 64
+  - 96
+  - 128
+  - 192
+  - 256
+  - 320
+  - 384
+  - 448
+  kernel_sizes:
+  - 5
+  - 5
+  - 5
+  - 3
+  - 3
+  - 3
+  - 3
+  - 3
+  dropout: 0.2
+  feature_cols:
+  - gaze_x
+  - gaze_y
+  - is_fixation
+  min_clip_len: 10
+
+training:
+  batch_size: 32
+  class_weight: null
+  epochs: 100
+  learning_rate: 5.0e-4
+  weight_decay: 1.0e-5
+  patience: 50
+  test_subject_ratio: 0.2
+  grad_clip: 1.0
+  warmup_epochs: 8
+
+vote:
+  threshold: 0.5
+
+random_state: 42
