@@ -17,7 +17,7 @@ def load_and_preprocess(bj_path, zj_path):
     df['unique_subject'] = df['dataset'] + '_' + df['subject_id'].astype(str)
     df['unique_clip'] = df['unique_subject'] + '_clip_' + df['clip_id'].astype(str)
 
-    df['is_fixation'] = (df['original_type'] == 'Fixation').astype(float)
+    df = df[df['original_type'] == 'Fixation'].reset_index(drop=True)
     df = df.sort_values(['unique_clip', 'timestamp']).reset_index(drop=True)
 
     print(f"\n{'='*50}")

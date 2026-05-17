@@ -2,7 +2,6 @@ data:
   bj_path: data/dataset_BJ.csv
   data_dir: data
   zj_path: data/dataset_ZJ.csv
-
 model:
   max_seq_len: 200
   num_channels:
@@ -23,25 +22,23 @@ model:
   - 3
   - 3
   - 3
-  dropout: 0.1
+  dropout: 0.1   
   feature_cols:
   - gaze_x
   - gaze_y
-  - is_fixation
   min_clip_len: 10
-
 training:
   batch_size: 32
   class_weight: null
   epochs: 100
   learning_rate: 5.0e-4
   weight_decay: 1.0e-5
-  patience: 50   #想看下最终结果的时候就设为50
+  patience: 100   #想看下最终结果的时候就设为50
   test_subject_ratio: 0.2
   grad_clip: 1.0
-  warmup_epochs: 13 #8-13都尝试了，结果区别较大
+  warmup_epochs: 10 #8-13都尝试了，结果区别较大
 
 vote:
-  threshold: 0.50
+  threshold: 0.53
 
 random_state: 42
