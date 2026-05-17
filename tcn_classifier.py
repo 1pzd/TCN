@@ -413,6 +413,10 @@ def main():
     X_train, y_train, _ = create_sequences(train_df)
     X_test, y_test, test_clip_info = create_sequences(test_df)
 
+    print(f"\n{'='*50}")
+    print(f"训练集: {len(X_train)} clips")
+    print(f"测试集: {len(X_test)} clips")
+
     train_dataset = EyeTrackingDataset(torch.FloatTensor(X_train), torch.LongTensor(y_train))
     test_dataset = EyeTrackingDataset(torch.FloatTensor(X_test), torch.LongTensor(y_test))
 
@@ -447,11 +451,11 @@ def main():
     print(f"    FN={cm[1,0]}  TP={cm[1,1]}")
 
     clip_results = predict_clips(model, df)
-    
+
     print(f"\n{'='*50}")
     print("受试者级 Bagging 投票决策:")
     subject_results = subject_majority_vote(clip_results)
-    
+
     correct_subjects = (subject_results['true_label'] == subject_results['pred_label']).sum()
     total_subjects = len(subject_results)
     subject_acc = correct_subjects / total_subjects

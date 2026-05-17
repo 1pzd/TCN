@@ -7,7 +7,6 @@ from collections import Counter
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 from src.trainer import EyeTrackingDataset
-from src.data_loader import compute_gaze_features, FEATURE_NAMES
 
 
 def predict_clips(model, df, feature_cols, max_seq_len, min_clip_len, batch_size, device,
@@ -20,16 +19,13 @@ def predict_clips(model, df, feature_cols, max_seq_len, min_clip_len, batch_size
         if restrict_clips is not None and unique_clip not in restrict_clips:
             continue
         group = group.sort_values('timestamp')
+        values = group[feature_cols].values.astype(np.float32)
         subject = group['unique_subject'].iloc[0]
         clip_id = group['clip_id'].iloc[0]
         label = group['label'].iloc[0]
 
-        if len(group) < min_clip_len:
+        if len(values) < min_clip_len:
             continue
-
-        all_feats = compute_gaze_features(group)
-        col_indices = [FEATURE_NAMES.index(col) for col in feature_cols]
-        values = all_feats[:, col_indices].astype(np.float32)
 
         if len(values) > max_seq_len:
             values = values[:max_seq_len]
