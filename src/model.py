@@ -117,7 +117,7 @@ class TCNClassifier(nn.Module):
             kernel_sizes = [kernel_sizes] * len(num_channels)
         self.num_channels = num_channels
         self.kernel_sizes = kernel_sizes
-        self.fusion_levels = [2, 4, len(num_channels) - 1]
+        self.fusion_levels = sorted(set([2, 4, len(num_channels) - 1]))
 
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_sizes, dropout)
 

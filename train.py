@@ -79,15 +79,8 @@ def main():
         'dropout': model_cfg['dropout'],
     }, 'output_model/tcn_model.pth')
 
-    torch.save({
-        'sequences': torch.FloatTensor(X_test),
-        'labels': [int(l) for l in y_test],
-        'clip_info': test_clip_info,
-    }, 'output_model/test_clip_data.pt')
-
     print(f"\n{'='*50}")
     print(f"模型已保存至 output_model/tcn_model.pth")
-    print(f"测试集数据已保存至 output_model/test_clip_data.pt")
 
     return model, clip_results, subject_results
 

@@ -32,6 +32,50 @@ def load_and_preprocess(bj_path, zj_path):
     return df
 
 
+def compute_gaze_features(group):
+    group = group.sort_values('timestamp').reset_index(drop=True)
+    raw = group[['gaze_x', 'gaze_y']].values.astype(np.float32)
+    n = len(raw)
+
+    dx = np.diff(raw[:, 0])
+    dy = np.diff(raw[:, 1])
+    vel = np.sqrt(dx**2 + dy**2)
+    vel = np.concatenate([[0.0], vel])
+
+    vel_x = np.concatenate([[0.0], dx])
+    vel_y = np.concatenate([[0.0], dy])
+
+    acc = np.diff(vel)
+    acc = np.concatenate([[0.0], acc])
+
+    disp_x = np.zeros(n, dtype=np.float32)
+    disp_y = np.zeros(n, dtype=np.float32)
+    for i in range(n):
+        start = max(0, i - 4)
+        end = i + 1
+        disp_x[i] = np.std(raw[start:end, 0])
+        disp_y[i] = np.std(raw[start:end, 1])
+
+    result = np.column_stack([
+        raw,
+        vel.reshape(-1, 1),
+        vel_x.reshape(-1, 1),
+        vel_y.reshape(-1, 1),
+        acc.reshape(-1, 1),
+        disp_x.reshape(-1, 1),
+        disp_y.reshape(-1, 1),
+    ])
+    return result
+
+
+FEATURE_NAMES = [
+    'gaze_x', 'gaze_y',
+    'gaze_vel', 'gaze_vel_x', 'gaze_vel_y',
+    'gaze_acc',
+    'disp_x', 'disp_y',
+]
+
+
 def create_sequences(df, feature_cols, max_seq_len, min_clip_len):
     clip_lengths = df.groupby('unique_clip').size()
     print(f"\nClip长度统计: min={clip_lengths.min()}, max={clip_lengths.max()}, "
@@ -43,13 +87,16 @@ def create_sequences(df, feature_cols, max_seq_len, min_clip_len):
 
     for unique_clip, group in df.groupby('unique_clip'):
         group = group.sort_values('timestamp')
-        values = group[feature_cols].values.astype(np.float32)
         label = group['label'].iloc[0]
         subject = group['unique_subject'].iloc[0]
         clip_id = group['clip_id'].iloc[0]
 
-        if len(values) < min_clip_len:
+        if len(group) < min_clip_len:
             continue
+
+        all_feats = compute_gaze_features(group)
+        col_indices = [FEATURE_NAMES.index(col) for col in feature_cols]
+        values = all_feats[:, col_indices].astype(np.float32)
 
         if len(values) > max_seq_len:
             values = values[:max_seq_len]
@@ -66,6 +113,7 @@ def create_sequences(df, feature_cols, max_seq_len, min_clip_len):
     labels = np.array(labels, dtype=np.int64)
 
     print(f"序列构建完成: {len(sequences)} clips, shape={sequences.shape}")
+    print(f"  特征列: {feature_cols}")
     print(f"  标签分布: 0={np.sum(labels==0)}, 1={np.sum(labels==1)}")
 
     return sequences, labels, clip_info

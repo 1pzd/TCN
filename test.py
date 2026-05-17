@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from src.config import load_config
-from src.data_loader import load_and_preprocess
+from src.data_loader import load_and_preprocess, create_sequences, split_by_subject
 from src.model import TCNClassifier
 from src.predict import predict_clips, predict_from_data, subject_majority_vote, print_clip_details, print_subject_results
 
@@ -38,27 +38,35 @@ def main():
     print(f"\n模型参数量: {total_params:,}")
     print(f"模型加载完成: output_model/tcn_model.pth")
 
-    test_data = torch.load('output_model/test_clip_data.pt', map_location='cpu', weights_only=False)
-    test_sequences = test_data['sequences']
-    test_labels = test_data['labels']
-    test_clip_info = test_data['clip_info']
+    df = load_and_preprocess(cfg['data']['bj_path'], cfg['data']['zj_path'])
+    model_cfg = cfg['model']
+    train_cfg = cfg['training']
+
+    _, test_df, _, _ = split_by_subject(
+        df, train_cfg['test_subject_ratio'], cfg['random_state']
+    )
+
+    X_test, y_test, test_clip_info = create_sequences(
+        test_df, model_cfg['feature_cols'],
+        model_cfg['max_seq_len'], model_cfg['min_clip_len']
+    )
 
     clip_info_with_labels = [
-        (subject, clip_id, unique_clip, test_labels[i])
+        (subject, clip_id, unique_clip, y_test[i])
         for i, (subject, clip_id, unique_clip) in enumerate(test_clip_info)
     ]
 
-    print(f"\n测试集: {len(test_sequences)} clips")
-    print(f"  标签分布: 0={sum(1 for l in test_labels if l==0)}, 1={sum(1 for l in test_labels if l==1)}")
+    print(f"\n测试集: {len(X_test)} clips")
+    print(f"  特征维度: {X_test.shape[2]}")
+    print(f"  标签分布: 0={sum(1 for l in y_test if l==0)}, 1={sum(1 for l in y_test if l==1)}")
 
-    test_clip_results = predict_from_data(model, test_sequences, clip_info_with_labels,
+    test_clip_results = predict_from_data(model, X_test, clip_info_with_labels,
                                           cfg['training']['batch_size'], device)
     print_clip_details(test_clip_results)
 
-    df = load_and_preprocess(cfg['data']['bj_path'], cfg['data']['zj_path'])
     all_clip_results = predict_clips(
-        model, df, cfg['model']['feature_cols'], cfg['model']['max_seq_len'],
-        cfg['model']['min_clip_len'], cfg['training']['batch_size'], device
+        model, df, model_cfg['feature_cols'], model_cfg['max_seq_len'],
+        model_cfg['min_clip_len'], train_cfg['batch_size'], device
     )
     vote_threshold = cfg.get('vote', {}).get('threshold', 0.5)
     subject_results = subject_majority_vote(all_clip_results, threshold=vote_threshold)
