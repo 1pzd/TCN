@@ -42,6 +42,9 @@ def main():
         test_labels = test_data['labels']
         test_clip_info = test_data['clip_info']
 
+        test_subjects = sorted(set(s for s, _, _ in test_clip_info))
+        print(f"\n  折{fold+1}/3 — 测试集受试者 ({len(test_subjects)}人): {test_subjects}")
+
         clip_info_with_labels = [
             (subject, clip_id, unique_clip, test_labels[i])
             for i, (subject, clip_id, unique_clip) in enumerate(test_clip_info)
@@ -56,6 +59,10 @@ def main():
         print(f"  折{fold+1} 测试: {n_total} clips, "
               f"正确={n_correct}, 错误={n_total-n_correct}, "
               f"准确率={n_correct/n_total*100:.2f}%")
+
+        vote_threshold = cfg.get('vote', {}).get('threshold', 0.5)
+        fold_subject_results = subject_majority_vote(fold_results, threshold=vote_threshold)
+        print_subject_results(fold_subject_results)
 
     print(f"\n{'='*60}")
     print("3折交叉验证汇总")

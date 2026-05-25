@@ -38,6 +38,7 @@ def main():
 
         test_subjects = fold_info[fold_info['fold'] == fold]['unique_subject'].tolist()
         train_subjects = fold_info[fold_info['fold'] != fold]['unique_subject'].tolist()
+        print(f"  测试集受试者 ({len(test_subjects)}人): {sorted(test_subjects)}")
 
         train_df = df[df['unique_subject'].isin(train_subjects)].reset_index(drop=True)
         test_df = df[df['unique_subject'].isin(test_subjects)].reset_index(drop=True)

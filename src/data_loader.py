@@ -88,9 +88,11 @@ def kfold_split_subjects(df, n_splits=3, random_state=42):
     print(f"\nK折划分 (n_splits={n_splits}):")
     for f in range(n_splits):
         fold_subjects = subjects[subjects['fold'] == f]
+        subject_ids = sorted(fold_subjects['unique_subject'].tolist())
         print(f"  折{f+1}: {len(fold_subjects)} 受试者 "
               f"(BJ={len(fold_subjects[fold_subjects['label']==1])}, "
               f"ZJ={len(fold_subjects[fold_subjects['label']==0])})")
+        print(f"    受试者ID: {subject_ids}")
     return subjects
 
 
