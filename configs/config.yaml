@@ -1,7 +1,9 @@
 data:
-  bj_path: data/dataset_BJ.csv
+  # bj_path: data/dataset_BJ.csv
+  bj_path: data/dataset_BJ_predicted.csv
   data_dir: data
-  zj_path: data/dataset_ZJ.csv
+  # zj_path: data/dataset_ZJ.csv
+  zj_path: data/dataset_ZJ_predicted.csv
 model:
   max_seq_len: 200
   num_channels:

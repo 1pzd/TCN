@@ -48,17 +48,20 @@ def evaluate(model, loader, criterion, device):
     total_loss = 0
     all_preds = []
     all_labels = []
+    all_probs = []
     for inputs, labels in loader:
         inputs, labels = inputs.to(device), labels.to(device)
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         total_loss += loss.item()
+        probs = F.softmax(outputs, dim=1)
         _, predicted = torch.max(outputs, 1)
         all_preds.extend(predicted.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
+        all_probs.extend(probs[:, 1].cpu().numpy())
 
     acc = accuracy_score(all_labels, all_preds)
-    return total_loss / len(loader), acc, all_preds, all_labels
+    return total_loss / len(loader), acc, all_preds, all_labels, all_probs
 
 
 def train_model(model, train_loader, test_loader, cfg, device):
@@ -108,7 +111,7 @@ def train_model(model, train_loader, test_loader, cfg, device):
                 train_cfg['grad_clip'], pbar
             )
 
-            test_loss, test_acc, _, _ = evaluate(model, test_loader, criterion, device)
+            test_loss, test_acc, _, _, _ = evaluate(model, test_loader, criterion, device)
 
             if current_lr == optimizer.param_groups[0]['lr']:
                 scheduler.step(test_acc)

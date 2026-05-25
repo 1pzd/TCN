@@ -17,6 +17,9 @@ def load_and_preprocess(bj_path, zj_path):
     df['unique_subject'] = df['dataset'] + '_' + df['subject_id'].astype(str)
     df['unique_clip'] = df['unique_subject'] + '_clip_' + df['clip_id'].astype(str)
 
+    df = df[df['validity'] == 1].reset_index(drop=True)
+    df = df[df['clip_id'] != 0].reset_index(drop=True)
+    df = df[df['clip_id'] != -1].reset_index(drop=True)
     df = df[df['original_type'] == 'Fixation'].reset_index(drop=True)
     df = df.sort_values(['unique_clip', 'timestamp']).reset_index(drop=True)
 
@@ -69,6 +72,26 @@ def create_sequences(df, feature_cols, max_seq_len, min_clip_len):
     print(f"  标签分布: 0={np.sum(labels==0)}, 1={np.sum(labels==1)}")
 
     return sequences, labels, clip_info
+
+
+def kfold_split_subjects(df, n_splits=3, random_state=42):
+    subjects = df[['unique_subject', 'label']].drop_duplicates().reset_index(drop=True)
+    n_subjects = len(subjects)
+    fold_labels = np.full(n_subjects, -1, dtype=int)
+    rng = np.random.RandomState(random_state)
+    for label in [0, 1]:
+        idxs = subjects[subjects['label'] == label].index.tolist()
+        rng.shuffle(idxs)
+        for i, idx in enumerate(idxs):
+            fold_labels[idx] = i % n_splits
+    subjects['fold'] = fold_labels
+    print(f"\nK折划分 (n_splits={n_splits}):")
+    for f in range(n_splits):
+        fold_subjects = subjects[subjects['fold'] == f]
+        print(f"  折{f+1}: {len(fold_subjects)} 受试者 "
+              f"(BJ={len(fold_subjects[fold_subjects['label']==1])}, "
+              f"ZJ={len(fold_subjects[fold_subjects['label']==0])})")
+    return subjects
 
 
 def split_by_subject(df, test_ratio, random_state=42):

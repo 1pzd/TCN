@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from collections import Counter
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
 from src.trainer import EyeTrackingDataset
 
@@ -136,27 +136,18 @@ def predict_from_data(model, sequences, clip_info, batch_size, device):
     return pd.DataFrame(results)
 
 
-def print_clip_details(clip_results):
-    clip_results = clip_results.sort_values('clip_id').reset_index(drop=True)
-    print(f"\n{'='*80}")
-    print("Clip 级预测详情")
-    print(f"{'='*80}")
-    print(f"{'受试者':>14} | {'ClipID':>5} | {'真实标签':>8} | {'预测标签':>8} | {'P(弱/0)':>8} | {'P(强/1)':>8} | {'结果':>6}")
-    print("-" * 80)
-    correct = 0
-    for _, row in clip_results.iterrows():
-        true_label = row['true_label']
-        pred_label = row['pred_label']
-        true_name = 'BJ(强)' if true_label == 1 else 'ZJ(弱)'
-        pred_name = 'BJ(强)' if pred_label == 1 else 'ZJ(弱)'
-        correct_mark = '[OK]' if true_label == pred_label else '[NO]'
-        if true_label == pred_label:
-            correct += 1
-        print(f"{row['unique_subject']:>14} | {row['clip_id']:>5} | {true_name:>8} | {pred_name:>8} | "
-              f"{row['prob_0']:>8.4f} | {row['prob_1']:>8.4f} | {correct_mark:>6}")
-    print("-" * 80)
-    print(f"Clip 级准确率: {correct}/{len(clip_results)} = {correct/len(clip_results)*100:.2f}%")
-    return correct / len(clip_results)
+def print_clip_details(clip_results, title="Clip 级"):
+    correct = (clip_results['true_label'] == clip_results['pred_label']).sum()
+    total = len(clip_results)
+    wrong = total - correct
+    clip_acc = correct / total if total > 0 else 0
+    print(f"\n{title} — 正确: {correct}, 错误: {wrong}, 准确率: {clip_acc*100:.2f}% ({correct}/{total})")
+    try:
+        auc = roc_auc_score(clip_results['true_label'], clip_results['prob_1'])
+        print(f"{title} AUC: {auc:.4f}")
+    except ValueError:
+        print(f"{title} AUC: N/A")
+    return clip_acc
 
 
 def print_subject_results(subject_results):
@@ -176,6 +167,11 @@ def print_subject_results(subject_results):
     total = len(subject_results)
     print(f"\n受试者级准确率: {correct/total:.4f} ({correct}/{total})")
     print(f"受试者级 F1: {f1_score(subject_results['true_label'], subject_results['pred_label']):.4f}")
+    try:
+        subject_auc = roc_auc_score(subject_results['true_label'], subject_results['bj_ratio'])
+        print(f"受试者级 AUC:  {subject_auc:.4f}")
+    except ValueError:
+        print(f"受试者级 AUC:  N/A")
 
     tie_count = subject_results['tie'].sum()
     if tie_count > 0:
@@ -188,12 +184,18 @@ def print_subject_results(subject_results):
         print(f"  {label_name}: {correct_sub}/{len(subset)} ({correct_sub/len(subset)*100:.1f}%)")
 
 
-def print_clip_results(test_labels, test_preds):
+def print_clip_results(test_labels, test_preds, test_probs=None):
     print(f"\n{'='*50}")
     print("Clip级测试结果:")
     print(f"  准确率:  {accuracy_score(test_labels, test_preds):.4f}")
     print(f"  精确率:  {precision_score(test_labels, test_preds):.4f}")
     print(f"  召回率:  {recall_score(test_labels, test_preds):.4f}")
     print(f"  F1分数:  {f1_score(test_labels, test_preds):.4f}")
+    if test_probs is not None:
+        try:
+            auc_val = roc_auc_score(test_labels, test_probs)
+            print(f"  AUC:     {auc_val:.4f}")
+        except ValueError:
+            print(f"  AUC:     N/A")
     cm = confusion_matrix(test_labels, test_preds)
     print(f"  混淆矩阵: TN={cm[0,0]} FP={cm[0,1]} FN={cm[1,0]} TP={cm[1,1]}")
