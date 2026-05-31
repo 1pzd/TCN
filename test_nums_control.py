@@ -2,14 +2,15 @@ import os
 import sys
 import pandas as pd
 import torch
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 from src.config import load_config
 from src.model import TCNClassifier
 from src.predict import predict_from_data, subject_majority_vote
 
 
-CLIP_IDS = [1]
+CLIP_PAIRS = [(1,2), (3,4), (5,6), (7,8), (9,10),
+              (11,12), (13,14), (15,16), (17,18), (19,20)]
 
 
 def main():
@@ -18,12 +19,12 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"PyTorch: {torch.__version__} | Device: {device}")
 
+    # ── Step 1: 3折预测（保存全部clip结果） ──
     print(f"\n{'='*60}")
-    print(f"利用 clip_id ∈ {CLIP_IDS} 进行评分")
+    print("第1步：运行3折预测（保留全部clip）")
     print(f"{'='*60}")
 
-    all_clip_results = []
-
+    all_fold_results = []
     for fold in range(3):
         model_path = f'output_model/tcn_model_fold{fold+1}.pth'
         data_path = f'output_model/test_clip_data_fold{fold+1}.pt'
@@ -57,52 +58,75 @@ def main():
         fold_results = predict_from_data(model, test_sequences, clip_info_with_labels,
                                          cfg['training']['batch_size'], device)
 
-        fold_filtered = fold_results[fold_results['clip_id'].isin(CLIP_IDS)].copy()
-        dropped = len(fold_results) - len(fold_filtered)
-        print(f"  折{fold+1}: {len(fold_results)} clips → 过滤后 {len(fold_filtered)} clips (排除 {dropped})")
-        all_clip_results.append(fold_filtered)
+        print(f"  折{fold+1}: {len(fold_results)} clips")
+        all_fold_results.append(fold_results)
 
-    print(f"\n{'='*60}")
-    print(f"汇总 — 仅 clip_id ∈ {CLIP_IDS}")
-    print(f"{'='*60}")
+    # ── Step 2: 10组 clip pair 逐一评估 ──
+    print(f"\n{'='*80}")
+    print("第2步：clip 两两组评估（共10组）")
+    print(f"{'='*80}")
 
-    combined_clip = pd.concat(all_clip_results, ignore_index=True)
+    rows = []
+    for c1, c2 in CLIP_PAIRS:
+        pair_ids = [c1, c2]
 
-    subject_results = subject_majority_vote(combined_clip, threshold=0.55)
+        pair_parts = [
+            df[df['clip_id'].isin(pair_ids)]
+            for df in all_fold_results
+        ]
+        combined_clip = pd.concat(pair_parts, ignore_index=True)
+        subject_results = subject_majority_vote(combined_clip, threshold=0.55)
 
-    print(f"\n各受试者投票结果:")
-    for _, row in subject_results.iterrows():
-        dataset_actual = 'BJ' if row['true_label'] == 1 else 'ZJ'
-        dataset_pred = 'BJ' if row['pred_label'] == 1 else 'ZJ'
-        correct_mark = '[OK]' if row['true_label'] == row['pred_label'] else '[NO]'
-        print(f"  {row['unique_subject']:>12}: "
-              f"真实={dataset_actual} 预测={dataset_pred} "
-              f"ZJ:BJ={row['vote_0']}:{row['vote_1']} "
-              f"(BJ占比{row['bj_ratio']:.1%}) "
-              f"({row['total_clips']}clips) {correct_mark}")
+        # Subject-level ACC / AUC
+        subject_acc = (subject_results['true_label'] == subject_results['pred_label']).mean()
+        try:
+            subject_auc = roc_auc_score(subject_results['true_label'], subject_results['bj_ratio'])
+        except ValueError:
+            subject_auc = None
 
-    correct = (subject_results['true_label'] == subject_results['pred_label']).sum()
-    total = len(subject_results)
-    print(f"\n受试者级准确率: {correct/total:.4f} ({correct}/{total})")
-    print(f"受试者级 F1: {f1_score(subject_results['true_label'], subject_results['pred_label']):.4f}")
-    try:
-        subject_auc = roc_auc_score(subject_results['true_label'], subject_results['bj_ratio'])
-        print(f"受试者级 AUC:  {subject_auc:.4f}")
-    except ValueError:
-        print(f"受试者级 AUC:  N/A")
+        # Clip-level ACC / AUC
+        clip_acc = (combined_clip['true_label'] == combined_clip['pred_label']).mean()
+        try:
+            clip_auc = roc_auc_score(combined_clip['true_label'], combined_clip['prob_1'])
+        except ValueError:
+            clip_auc = None
 
-    tie_count = subject_results['tie'].sum()
-    if tie_count > 0:
-        print(f"  平局受试者: {tie_count}")
+        rows.append({
+            'pair':      f'({c1},{c2})',
+            'subj_acc':  subject_acc,
+            'subj_auc':  subject_auc,
+            'clip_acc':  clip_acc,
+            'clip_auc':  clip_auc,
+        })
 
-    print(f"\n分类汇总:")
-    for true_label, label_name in [(0, 'ZJ(弱)'), (1, 'BJ(强)')]:
-        subset = subject_results[subject_results['true_label'] == true_label]
-        correct_sub = (subset['true_label'] == subset['pred_label']).sum()
-        print(f"  {label_name}: {correct_sub}/{len(subset)} ({correct_sub/len(subset)*100:.1f}%)")
+        subj_auc_s = f'{subject_auc:.4f}' if subject_auc is not None else ' N/A'
+        clip_auc_s = f'{clip_auc:.4f}' if clip_auc is not None else ' N/A'
+        print(f"  ({c1:>2},{c2:<2}):  subject ACC={subject_acc:.4f} AUC={subj_auc_s}  |  "
+              f"clip ACC={clip_acc:.4f} AUC={clip_auc_s}")
 
-    return combined_clip, subject_results
+    # ── Step 3: 汇总表格 ──
+    results_df = pd.DataFrame(rows)
+
+    print(f"\n{'='*90}")
+    print("汇总表格")
+    print(f"{'='*90}")
+    header = f"{'pair':>10}  {'subj_acc':>9}  {'subj_auc':>9}  {'clip_acc':>9}  {'clip_auc':>9}"
+    print(header)
+    print('-' * len(header))
+    for _, r in results_df.iterrows():
+        fmt = lambda v: f'{v:.4f}' if pd.notna(v) else '   N/A'
+        print(f"{r['pair']:>10}  {fmt(r['subj_acc']):>9}  {fmt(r['subj_auc']):>9}  "
+              f"{fmt(r['clip_acc']):>9}  {fmt(r['clip_auc']):>9}")
+
+    print(f"\n均值 ± 标准差:")
+    for col, label in [('subj_acc', 'subject ACC'), ('subj_auc', 'subject AUC'),
+                       ('clip_acc', 'clip ACC'),   ('clip_auc', 'clip AUC')]:
+        mean_v = results_df[col].mean()
+        std_v  = results_df[col].std()
+        print(f"  {label:>15}: {mean_v:.4f} ± {std_v:.4f}")
+
+    return results_df
 
 
 if __name__ == '__main__':
-    combined_clip, subject_results = main()
+    results_df = main()
