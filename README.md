@@ -16,13 +16,20 @@ d:\code-en\
 │   ├── dataset_ZJ.csv           # ZJ 弱组原始数据集（标签=0）
 │   ├── dataset_BJ_predicted.csv # BJ 数据集（gaze 替换为预测值）
 │   └── dataset_ZJ_predicted.csv # ZJ 数据集（gaze 替换为预测值）
+├── output_model/                # 训练输出文件夹（模型 + 测试数据）
+│   ├── tcn_model_fold{1,2,3}.pth      # 3 折训练的模型权重
+│   ├── tcn_model.pth                  # 单独训练的模型权重
+│   ├── test_clip_data_fold{1,2,3}.pt  # 3 折测试集序列数据
+│   └── test_clip_data.pt              # 单独的测试集序列数据
 ├── train.py                     # 3折交叉验证训练入口
 ├── test.py                      # 3折交叉验证独立测试入口
 ├── test_nums_control.py         # 指定 clip_id 评分的测试入口
 ├── predict_only.py              # 纯预测入口（加载已有模型预测全部数据）
 ├── tcn_classifier.py            # 独立单文件版 TCN 分类器（无配置文件依赖）
+├── ablation_clip_groups.py      # Clip 分组消融实验脚本
 ├── merge_predicted_gaze.py      # 将外部 gaze 预测结果合并到原始数据集
 ├── adapt_gaze_to_pipeline.py    # 将外部 gaze 预测 CSV 适配为管线输入格式
+├── clip_exp_*.png               # 实验结果可视化图片（5张）
 ├── .gitignore                   # Git 忽略规则
 └── README.md                    # 本文件
 ```
@@ -190,6 +197,34 @@ subject_results = subject_majority_vote(clip_results, threshold=0.55)
 
 ---
 
+### `output_model/` — 输出模型文件夹
+
+训练输出目录，保存训练好的模型权重和测试集数据。
+
+| 文件 | 说明 |
+|------|------|
+| `tcn_model_fold{1,2,3}.pth` | 3 折交叉验证中每折训练的模型权重（含模型结构参数和 state_dict） |
+| `tcn_model.pth` | 单独训练的模型权重（由 `predict_only.py` 使用） |
+| `test_clip_data_fold{1,2,3}.pt` | 3 折测试集的序列数据（含 sequences、labels、clip_info） |
+| `test_clip_data.pt` | 单独的测试集序列数据 |
+
+**模型文件内容**（`.pth`）：
+- `model_state_dict` — 模型权重
+- `input_size` — 输入特征维度
+- `num_channels` — TCN 各层通道数
+- `num_classes` — 分类类别数
+- `kernel_sizes` — 各层卷积核大小
+- `dropout` — Dropout 比率
+
+**测试数据文件内容**（`.pt`）：
+- `sequences` — 测试集时序序列张量
+- `labels` — 测试集标签
+- `clip_info` — clip 元信息列表（subject_id, clip_id, unique_clip）
+
+**注意**：此文件夹已被 `.gitignore` 忽略，不会提交到 Git 仓库。
+
+---
+
 ### `data/` — 数据文件夹
 
 | 文件 | 说明 |
@@ -331,6 +366,39 @@ python adapt_gaze_to_pipeline.py <gaze_csv_path> [--bj <bj_path>] [--zj <zj_path
 
 ---
 
+#### `ablation_clip_groups.py` — Clip 分组消融实验
+**作用**：按预定义的 clip 分组进行消融实验，评估不同 clip 组合的分类效果。
+
+**分组策略**（默认 7 组，每组 3 个 clip）：
+```python
+CLIP_GROUPS = [(1,2,3), (4,5,6), (7,8,9), (10,11,12),
+               (13,14,15), (16,17,18), (19,20,1)]
+```
+
+**流程**：
+1. 加载 3 折训练好的模型和测试数据
+2. 对每组 clip 进行 subject 级和 clip 级评估
+3. 输出各组的 ACC、AUC 指标
+4. 计算均值 ± 标准差汇总
+
+**输出指标**：
+
+| 指标 | 说明 |
+|------|------|
+| `subj_acc` | Subject 级准确率 |
+| `subj_auc` | Subject 级 AUC（基于 BJ 比例） |
+| `clip_acc` | Clip 级准确率 |
+| `clip_auc` | Clip 级 AUC（基于预测概率） |
+
+**运行**（需先执行 `train.py`）：
+```bash
+python ablation_clip_groups.py
+```
+
+**自定义分组**：修改文件顶部 `CLIP_GROUPS` 列表。
+
+---
+
 ## 环境要求
 
 | 组件 | 最低版本 |
@@ -381,3 +449,31 @@ python tcn_classifier.py
        ├── 3 折交叉验证训练
        └── 输出 output_model/tcn_model_fold{1,2,3}.pth
 
+3. 测试评估
+   ├── python test.py           # 汇总 3 折 held-out 结果
+   └── python test_nums_control.py  # 指定 clip_id 评估
+
+4. 消融实验（可选）
+   └── python ablation_clip_groups.py  # 按 clip 分组评估
+
+5. 预测部署
+   └── python predict_only.py   # 使用单模型预测全部数据
+```
+
+---
+
+## 实验结果
+
+项目包含以下实验结果可视化图片：
+
+| 文件 | 说明 |
+|------|------|
+| `clip_exp_acc.png` | Clip 级准确率实验结果 |
+| `clip_exp_bj_zj.png` | BJ/ZJ 分组实验结果对比 |
+| `clip_exp_f1_auc.png` | F1 分数和 AUC 实验结果 |
+| `clip_exp_table.png` | 实验结果汇总表格 |
+| `clip_experiment_results.png` | 综合实验结果展示 |
+
+这些图片展示了不同 clip 组合、不同评估指标下的分类效果，可用于论文或报告中的结果展示。
+
+---
