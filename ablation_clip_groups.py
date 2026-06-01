@@ -1,59 +1,30 @@
 import os
 import sys
-import itertools
 import pandas as pd
 import torch
-import numpy as np
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 from src.config import load_config
 from src.model import TCNClassifier
 from src.predict import predict_from_data, subject_majority_vote
 
-ALL_CLIP_IDS = list(range(1, 21))
 
-
-def evaluate_combination(combined_clip, clip_ids, threshold=0.55):
-    filtered = combined_clip[combined_clip['clip_id'].isin(clip_ids)].copy()
-    if len(filtered) == 0:
-        return None
-    subject_results = subject_majority_vote(filtered, threshold=threshold)
-    if len(subject_results) == 0:
-        return None
-
-    correct = (subject_results['true_label'] == subject_results['pred_label']).sum()
-    total = len(subject_results)
-    acc = correct / total
-
-    try:
-        f1 = f1_score(subject_results['true_label'], subject_results['pred_label'])
-    except Exception:
-        f1 = 0.0
-
-    try:
-        auc = roc_auc_score(subject_results['true_label'], subject_results['bj_ratio'])
-    except ValueError:
-        auc = float('nan')
-
-    return {
-        'clip_ids': clip_ids,
-        'accuracy': acc,
-        'f1': f1,
-        'auc': auc,
-        'correct': correct,
-        'total': total,
-        'n_subjects': total,
-        'n_clips': len(filtered)
-    }
+CLIP_GROUPS = [(1,2,3), (4,5,6), (7,8,9), (10,11,12),
+               (13,14,15), (16,17,18), (19,20,1)]
 
 
 def main():
     cfg = load_config()
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Device: {device}")
+    print(f"PyTorch: {torch.__version__} | Device: {device}")
+
+    # ── Step 1: 3折预测（保存全部clip结果） ──
+    print(f"\n{'='*60}")
+    print("第1步：运行3折预测（保留全部clip）")
+    print(f"{'='*60}")
 
     all_fold_results = []
-
     for fold in range(3):
         model_path = f'output_model/tcn_model_fold{fold+1}.pth'
         data_path = f'output_model/test_clip_data_fold{fold+1}.pt'
@@ -63,6 +34,7 @@ def main():
             sys.exit(1)
 
         checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+
         model = TCNClassifier(
             input_size=checkpoint['input_size'],
             num_channels=checkpoint['num_channels'],
@@ -85,56 +57,77 @@ def main():
 
         fold_results = predict_from_data(model, test_sequences, clip_info_with_labels,
                                          cfg['training']['batch_size'], device)
+
+        print(f"  折{fold+1}: {len(fold_results)} clips")
         all_fold_results.append(fold_results)
-        print(f"折{fold+1}: {len(fold_results)} clips")
 
-    combined_clip = pd.concat(all_fold_results, ignore_index=True)
-    available_ids = sorted(combined_clip['clip_id'].unique().tolist())
-    usable_ids = [cid for cid in ALL_CLIP_IDS if cid in available_ids]
-    print(f"\n可用 clip_id: {usable_ids}")
-    print(f"总计 clips: {len(combined_clip)}")
+    # ── Step 2: 5组 clip 四四评估 ──
+    print(f"\n{'='*80}")
+    print("第2步：clip 三三一组评估（共7组）")
+    print(f"{'='*80}")
 
-    threshold = cfg['training'].get('threshold', 0.55)
+    rows = []
+    for group in CLIP_GROUPS:
+        group_ids = list(group)
 
-    for group_name, group_size in [("两两一组 (2 clips)", 2), ("三三一组 (3 clips)", 3)]:
-        print(f"\n{'='*60}")
-        print(f"消融实验: {group_name}")
-        print(f"{'='*60}")
+        group_parts = [
+            df[df['clip_id'].isin(group_ids)]
+            for df in all_fold_results
+        ]
+        combined_clip = pd.concat(group_parts, ignore_index=True)
+        subject_results = subject_majority_vote(combined_clip, threshold=0.55)
 
-        all_combos = list(itertools.combinations(usable_ids, group_size))
-        print(f"组合总数: {len(all_combos)}")
+        # Subject-level ACC / AUC
+        subject_acc = (subject_results['true_label'] == subject_results['pred_label']).mean()
+        try:
+            subject_auc = roc_auc_score(subject_results['true_label'], subject_results['bj_ratio'])
+        except ValueError:
+            subject_auc = None
 
-        results = []
-        for i, combo in enumerate(all_combos):
-            combo_ids = list(combo)
-            res = evaluate_combination(combined_clip, combo_ids, threshold=threshold)
-            if res is not None:
-                results.append(res)
-            if (i + 1) % 100 == 0:
-                print(f"  进度: {i+1}/{len(all_combos)}")
+        # Clip-level ACC / AUC
+        clip_acc = (combined_clip['true_label'] == combined_clip['pred_label']).mean()
+        try:
+            clip_auc = roc_auc_score(combined_clip['true_label'], combined_clip['prob_1'])
+        except ValueError:
+            clip_auc = None
 
-        if not results:
-            print("  无有效结果")
-            continue
+        group_label = '(' + ','.join(str(g) for g in group) + ')'
+        rows.append({
+            'group':     group_label,
+            'subj_acc':  subject_acc,
+            'subj_auc':  subject_auc,
+            'clip_acc':  clip_acc,
+            'clip_auc':  clip_auc,
+        })
 
-        results.sort(key=lambda x: x['accuracy'], reverse=True)
-        top3 = results[:3]
+        subj_auc_s = f'{subject_auc:.4f}' if subject_auc is not None else ' N/A'
+        clip_auc_s = f'{clip_auc:.4f}' if clip_auc is not None else ' N/A'
+        print(f"  {group_label:>15}:  subject ACC={subject_acc:.4f} AUC={subj_auc_s}  |  "
+              f"clip ACC={clip_acc:.4f} AUC={clip_auc_s}")
 
-        print(f"\n排名前三:")
-        for rank, r in enumerate(top3, 1):
-            print(f"\n  第{rank}名: clip_ids = {r['clip_ids']}")
-            print(f"    受试者准确率: {r['accuracy']:.4f} ({r['correct']}/{r['total']})")
-            print(f"    受试者 F1:     {r['f1']:.4f}")
-            print(f"    受试者 AUC:    {r['auc']:.4f}" if not np.isnan(r['auc']) else
-                  f"    受试者 AUC:    N/A")
-            print(f"    受试者数: {r['n_subjects']}, clips: {r['n_clips']}")
+    # ── Step 3: 汇总表格 ──
+    results_df = pd.DataFrame(rows)
 
-        accs = [r['accuracy'] for r in results]
-        print(f"\n  统计: 总数={len(results)}, "
-              f"最高准确率={max(accs):.4f}, "
-              f"中位数={np.median(accs):.4f}, "
-              f"最低={min(accs):.4f}")
+    print(f"\n{'='*90}")
+    print("汇总表格")
+    print(f"{'='*90}")
+    header = f"{'group':>15}  {'subj_acc':>9}  {'subj_auc':>9}  {'clip_acc':>9}  {'clip_auc':>9}"
+    print(header)
+    print('-' * len(header))
+    for _, r in results_df.iterrows():
+        fmt = lambda v: f'{v:.4f}' if pd.notna(v) else '   N/A'
+        print(f"{r['group']:>15}  {fmt(r['subj_acc']):>9}  {fmt(r['subj_auc']):>9}  "
+              f"{fmt(r['clip_acc']):>9}  {fmt(r['clip_auc']):>9}")
+
+    print(f"\n均值 ± 标准差:")
+    for col, label in [('subj_acc', 'subject ACC'), ('subj_auc', 'subject AUC'),
+                       ('clip_acc', 'clip ACC'),   ('clip_auc', 'clip AUC')]:
+        mean_v = results_df[col].mean()
+        std_v  = results_df[col].std()
+        print(f"  {label:>15}: {mean_v:.4f} ± {std_v:.4f}")
+
+    return results_df
 
 
 if __name__ == '__main__':
-    main()
+    results_df = main()
