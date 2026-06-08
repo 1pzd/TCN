@@ -152,7 +152,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
 
 ## TODOs
 
-- [ ] 1. 新增 DualSEBlock 模块（通道+时序双分支注意力）
+- [x] 1. 新增 DualSEBlock 模块（通道+时序双分支注意力）
 
   **What to do**:
   - 在 `src/model.py` 中，`SEBlock` 类定义之后，新增 `DualSEBlock` 类
@@ -216,7 +216,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import DualSEBlock; print('OK')"`
 
-- [ ] 2. 新增 SinusoidalPositionalEncoding 模块
+- [x] 2. 新增 SinusoidalPositionalEncoding 模块
 
   **What to do**:
   - 在 `src/model.py` 中，`DualSEBlock` 类定义之后，新增 `SinusoidalPositionalEncoding` 类
@@ -280,7 +280,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import SinusoidalPositionalEncoding; print('OK')"`
 
-- [ ] 3. 新增 LevelWeightedFusion 模块
+- [x] 3. 新增 LevelWeightedFusion 模块
 
   **What to do**:
   - 在 `src/model.py` 中，`SinusoidalPositionalEncoding` 类定义之后，新增 `LevelWeightedFusion` 类
@@ -339,7 +339,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import LevelWeightedFusion; print('OK')"`
 
-- [ ] 4. 新增 ResidualClassifier 模块
+- [x] 4. 新增 ResidualClassifier 模块
 
   **What to do**:
   - 在 `src/model.py` 中，`LevelWeightedFusion` 类定义之后，新增 `ResidualClassifier` 类
@@ -399,7 +399,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import ResidualClassifier; print('OK')"`
 
-- [ ] 5. 修改 TemporalBlock 使用 DualSEBlock
+- [x] 5. 修改 TemporalBlock 使用 DualSEBlock
 
   **What to do**:
   - 在 `src/model.py` 的 `TemporalBlock.__init__` 中，将 `self.se = SEBlock(n_inputs, se_reduction)` 改为 `self.dual_se = DualSEBlock(n_inputs, se_reduction, se_temporal_kernel)`
@@ -461,7 +461,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import TemporalBlock; print('OK')"`
 
-- [ ] 6. 修改 TCNClassifier.__init__ 新增组件
+- [x] 6. 修改 TCNClassifier.__init__ 新增组件
 
   **What to do**:
   - 在 `src/model.py` 的 `TCNClassifier.__init__` 中，新增以下组件：
@@ -533,7 +533,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import TCNClassifier; print('OK')"`
 
-- [ ] 7. 修改 TCNClassifier.forward() 完整前向传播
+- [x] 7. 修改 TCNClassifier.forward() 完整前向传播
 
   **What to do**:
   - 修改 `src/model.py` 的 `TCNClassifier.forward()` 方法，按以下顺序：
@@ -618,7 +618,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `src/model.py`
   - Pre-commit: `python -c "from src.model import TCNClassifier; import torch; m = TCNClassifier(input_channels=2); x = torch.randn(2, 2, 200); y = m(x); print('OK')"`
 
-- [ ] 8. 更新 configs/config.yaml 新增架构开关参数
+- [x] 8. 更新 configs/config.yaml 新增架构开关参数
 
   **What to do**:
   - 在 `configs/config.yaml` 的 `model:` 部分末尾新增以下参数：
@@ -685,7 +685,7 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
   - Files: `configs/config.yaml`
   - Pre-commit: `python -c "import yaml; yaml.safe_load(open('configs/config.yaml')); print('OK')"`
 
-- [ ] 9. 端到端验证（实例化 + 前向传播 + 训练 1 epoch）
+- [x] 9. 端到端验证（实例化 + 前向传播 + 训练 1 epoch）
 
   **What to do**:
   - 运行端到端验证，确认整个管道正常工作：
@@ -760,19 +760,19 @@ Wave FINAL (After ALL tasks — 4 parallel reviews):
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, check comments). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .omo/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Review `src/model.py` for: syntax errors, import consistency, dimension mismatches, `# ARCH_BACKUP` comment completeness. Run `python -c "from src.model import TCNClassifier; print('OK')"` to verify importability.
   Output: `Import [PASS/FAIL] | ARCH_BACKUP [N/N complete] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Run full training pipeline for 1 fold, 2 epochs. Verify: loss decreases, metrics are computed, no runtime errors. Save training log to `.omo/evidence/final-qa/training-log.txt`.
   Output: `Training [PASS/FAIL] | Loss Decreased [YES/NO] | Metrics [values] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff. Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination. Flag unaccounted changes.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT`
 

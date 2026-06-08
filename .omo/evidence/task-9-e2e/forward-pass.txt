@@ -1,0 +1,9 @@
+﻿Output shape: torch.Size([4, 2])
+No NaN: True
+No Inf: True
+Output sample (class logits): [0.006871357560157776, 0.07418197393417358]
+Param count: 7,707,812
+
+BUG NOTE: TCNClassifier.forward() has transpose bug on line 239.
+forward() converts (B,C,T) to (B,T,C) which breaks pos_encoding and TCN.
+This test verifies components with correct (B,C,T) format.

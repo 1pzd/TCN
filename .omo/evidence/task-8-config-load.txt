@@ -1,0 +1,5 @@
+﻿use_dual_se: True
+se_temporal_kernel: 7
+use_positional_encoding: True
+use_level_weighting: True
+classifier_hidden_dim: None

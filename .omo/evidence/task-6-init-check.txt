@@ -1,0 +1,4 @@
+﻿pos_encoding: True
+attn_pool: True
+level_fusion: True
+classifier: ResidualClassifier

@@ -1,0 +1,3 @@
+﻿Short seq - Input: torch.Size([4, 2, 50]), Output: torch.Size([4, 2])
+No NaN: True
+No Inf: True

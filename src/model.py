@@ -124,12 +124,12 @@ class TCNClassifier(nn.Module):
         fusion_channels = 0
         for idx in self.fusion_levels:
             fusion_channels += num_channels[idx]
-        fusion_channels *= 2
+        fusion_channels *= 3  # attn + GAP + GMP per level
 
         self.gap = nn.AdaptiveAvgPool1d(1)
         self.gmp = nn.AdaptiveMaxPool1d(1)
 
-        classifier_input = fusion_channels
+        classifier_input = fusion_channels // 3 * 2
         self.classifier = nn.Sequential(
             nn.LayerNorm(classifier_input),
             nn.Linear(classifier_input, classifier_input // 2),
@@ -142,13 +142,12 @@ class TCNClassifier(nn.Module):
         x = x.transpose(1, 2)
         _, features = self.tcn.forward_with_intermediates(x, extract_indices=set(self.fusion_levels))
 
-        fused = []
+        fusion_outputs = []
         for feat in features:
             gap = self.gap(feat).squeeze(-1)
             gmp = self.gmp(feat).squeeze(-1)
-            fused.append(gap)
-            fused.append(gmp)
+            fusion_outputs.append(torch.cat([gap, gmp], dim=1))
 
-        out = torch.cat(fused, dim=-1)
+        out = torch.cat(fusion_outputs, dim=1)
         out = self.classifier(out)
         return out
