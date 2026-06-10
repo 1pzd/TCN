@@ -1,9 +1,9 @@
 data:
   # bj_path: data/dataset_BJ.csv
-  bj_path: data/dataset_BJ_predicted.csv
+  bj_path: data/dataset_BJ.csv
   data_dir: data
   # zj_path: data/dataset_ZJ.csv
-  zj_path: data/dataset_ZJ_predicted.csv
+  zj_path: data/dataset_ZJ.csv
 model:
   max_seq_len: 200
   num_channels:
@@ -35,12 +35,12 @@ training:
   epochs: 100
   learning_rate: 5.0e-4
   weight_decay: 1.0e-5
-  patience: 100   #想看下最终结果的时候就设为50
+  patience: 50   #想看下最终结果的时候就设为50
   test_subject_ratio: 0.2
   grad_clip: 1.0
   warmup_epochs: 10 #8-13都尝试了，结果区别较大
 
 vote:
-  threshold: 0.55
+  threshold: 0.50
 
 random_state: 42
