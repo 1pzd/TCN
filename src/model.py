@@ -120,28 +120,16 @@ class TCNClassifier(nn.Module):
         self.fusion_levels = [2, 4, len(num_channels) - 1]
 
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_sizes, dropout)
-        self.gru_hidden = 64
-        self.bigru = nn.GRU(
-            input_size=num_channels[-1],
-            hidden_size=self.gru_hidden,
-            num_layers=1,
-            batch_first=True,
-            bidirectional=True
-        )
 
         fusion_channels = 0
         for idx in self.fusion_levels:
             fusion_channels += num_channels[idx]
-        fusion_channels *= 3  # attn + GAP + GMP per level
+        fusion_channels *= 2
 
-        self.attn_pools = nn.ModuleList([
-            SelfAttentionPooling(num_channels[idx])
-            for idx in self.fusion_levels
-        ])
         self.gap = nn.AdaptiveAvgPool1d(1)
         self.gmp = nn.AdaptiveMaxPool1d(1)
 
-        classifier_input = fusion_channels + self.gru_hidden * 2
+        classifier_input = fusion_channels
         self.classifier = nn.Sequential(
             nn.LayerNorm(classifier_input),
             nn.Linear(classifier_input, classifier_input // 2),
@@ -152,18 +140,14 @@ class TCNClassifier(nn.Module):
 
     def forward(self, x):
         x = x.transpose(1, 2)
-        tcn_out, features = self.tcn.forward_with_intermediates(x, extract_indices=set(self.fusion_levels))
+        _, features = self.tcn.forward_with_intermediates(x, extract_indices=set(self.fusion_levels))
 
         fusion_outputs = []
-        for feat, attn_pool in zip(features, self.attn_pools):
-            attn = attn_pool(feat)
+        for feat in features:
             gap = self.gap(feat).squeeze(-1)
             gmp = self.gmp(feat).squeeze(-1)
-            fusion_outputs.append(torch.cat([attn, gap, gmp], dim=1))
+            fusion_outputs.append(torch.cat([gap, gmp], dim=1))
 
-        _, h_n = self.bigru(tcn_out.transpose(1, 2))
-        gru_feat = torch.cat([h_n[-2], h_n[-1]], dim=1)
-
-        out = torch.cat(fusion_outputs + [gru_feat], dim=1)
+        out = torch.cat(fusion_outputs, dim=1)
         out = self.classifier(out)
         return out
