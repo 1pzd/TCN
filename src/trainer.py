@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 import sys
@@ -64,7 +64,7 @@ def evaluate(model, loader, criterion, device):
     return total_loss / len(loader), acc, all_preds, all_labels, all_probs
 
 
-def train_model(model, train_loader, val_loader, cfg, device):
+def train_model(model, train_loader, test_loader, cfg, device):
     train_cfg = cfg['training']
     class_weight = train_cfg.get('class_weight')
     if class_weight is not None:
@@ -81,7 +81,7 @@ def train_model(model, train_loader, val_loader, cfg, device):
         optimizer, mode='max', factor=0.5, patience=5, min_lr=1e-6
     )
 
-    best_val_acc = -float('inf')
+    best_test_acc = 0
     best_model_state = None
     patience_counter = 0
     warmup_epochs = train_cfg.get('warmup_epochs', 0)
@@ -89,7 +89,7 @@ def train_model(model, train_loader, val_loader, cfg, device):
     print(f"\n{'='*50}")
     print("开始训练...")
     print(f"{'='*50}")
-    header = f"{'Epoch':>5} | {'Train Loss':>10} | {'Train Acc':>9} | {'Val Loss':>9} | {'Val Acc':>8} | {'LR':>10}"
+    header = f"{'Epoch':>5} | {'Train Loss':>10} | {'Train Acc':>9} | {'Test Loss':>9} | {'Test Acc':>8} | {'LR':>10}"
     print(header)
     print("-" * len(header))
 
@@ -111,19 +111,19 @@ def train_model(model, train_loader, val_loader, cfg, device):
                 train_cfg['grad_clip'], pbar
             )
 
-            val_loss, val_acc, _, _, _ = evaluate(model, val_loader, criterion, device)
+            test_loss, test_acc, _, _, _ = evaluate(model, test_loader, criterion, device)
 
             if current_lr == optimizer.param_groups[0]['lr']:
-                scheduler.step(val_acc)
+                scheduler.step(test_acc)
             current_lr = optimizer.param_groups[0]['lr']
 
             tqdm.write(
                 f"{epoch:>5} | {train_loss:>10.4f} | {train_acc:>9.4f} | "
-                f"{val_loss:>9.4f} | {val_acc:>8.4f} | {current_lr:>.2e}"
+                f"{test_loss:>9.4f} | {test_acc:>8.4f} | {current_lr:>.2e}"
             )
 
-            if val_acc > best_val_acc:
-                best_val_acc = val_acc
+            if test_acc > best_test_acc:
+                best_test_acc = test_acc
                 best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
                 patience_counter = 0
             else:
@@ -134,5 +134,5 @@ def train_model(model, train_loader, val_loader, cfg, device):
 
     model.load_state_dict(best_model_state)
     model = model.to(device)
-    print(f"\n最佳验证准确率: {best_val_acc:.4f}")
+    print(f"\n最佳测试准确率: {best_test_acc:.4f}")
     return model

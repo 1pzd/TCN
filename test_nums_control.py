@@ -9,7 +9,8 @@ from src.model import TCNClassifier
 from src.predict import predict_from_data, subject_majority_vote
 
 
-CLIP_PAIRS = [list(range(1, i)) for i in range(3, 23, 2)]
+CLIP_PAIRS = [(1,2), (3,4), (5,6), (7,8), (9,10),
+              (11,12), (13,14), (15,16), (17,18), (19,20)]
 
 
 def main():
@@ -39,9 +40,7 @@ def main():
             num_channels=checkpoint['num_channels'],
             num_classes=checkpoint['num_classes'],
             kernel_sizes=checkpoint.get('kernel_sizes', 3),
-            dropout=checkpoint['dropout'],
-            pooling_mode=checkpoint.get('pooling_mode', 'gap_gmp'),
-            classifier_hidden_size=checkpoint.get('classifier_hidden_size')
+            dropout=checkpoint['dropout']
         ).to(device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
@@ -68,9 +67,11 @@ def main():
     print(f"{'='*80}")
 
     rows = []
-    for clip_ids in CLIP_PAIRS:
+    for c1, c2 in CLIP_PAIRS:
+        pair_ids = [c1, c2]
+
         pair_parts = [
-            df[df['clip_id'].isin(clip_ids)]
+            df[df['clip_id'].isin(pair_ids)]
             for df in all_fold_results
         ]
         combined_clip = pd.concat(pair_parts, ignore_index=True)
@@ -90,9 +91,8 @@ def main():
         except ValueError:
             clip_auc = None
 
-        group_label = f"1-{clip_ids[-1]}"
         rows.append({
-            'pair':      group_label,
+            'pair':      f'({c1},{c2})',
             'subj_acc':  subject_acc,
             'subj_auc':  subject_auc,
             'clip_acc':  clip_acc,
@@ -101,7 +101,7 @@ def main():
 
         subj_auc_s = f'{subject_auc:.4f}' if subject_auc is not None else ' N/A'
         clip_auc_s = f'{clip_auc:.4f}' if clip_auc is not None else ' N/A'
-        print(f"  clip 1-{clip_ids[-1]:<2}:  subject ACC={subject_acc:.4f} AUC={subj_auc_s}  |  "
+        print(f"  ({c1:>2},{c2:<2}):  subject ACC={subject_acc:.4f} AUC={subj_auc_s}  |  "
               f"clip ACC={clip_acc:.4f} AUC={clip_auc_s}")
 
     # ── Step 3: 汇总表格 ──
@@ -113,14 +113,12 @@ def main():
     header = f"{'pair':>10}  {'subj_acc':>9}  {'subj_auc':>9}  {'clip_acc':>9}  {'clip_auc':>9}"
     print(header)
     print('-' * len(header))
-    def fmt(v):
-        return f'{v:.4f}' if pd.notna(v) else '   N/A'
-
     for _, r in results_df.iterrows():
+        fmt = lambda v: f'{v:.4f}' if pd.notna(v) else '   N/A'
         print(f"{r['pair']:>10}  {fmt(r['subj_acc']):>9}  {fmt(r['subj_auc']):>9}  "
               f"{fmt(r['clip_acc']):>9}  {fmt(r['clip_auc']):>9}")
 
-    print("\n均值 ± 标准差:")
+    print(f"\n均值 ± 标准差:")
     for col, label in [('subj_acc', 'subject ACC'), ('subj_auc', 'subject AUC'),
                        ('clip_acc', 'clip ACC'),   ('clip_auc', 'clip AUC')]:
         mean_v = results_df[col].mean()

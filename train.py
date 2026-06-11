@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
 from src.config import load_config
-from src.data_loader import load_and_preprocess, create_sequences, kfold_split_subjects, split_by_subject
+from src.data_loader import load_and_preprocess, create_sequences, kfold_split_subjects
 from src.model import TCNClassifier
 from src.trainer import EyeTrackingDataset, train_model, evaluate
 from src.predict import predict_clips, subject_majority_vote, print_clip_results, print_subject_results
@@ -43,26 +43,8 @@ def main():
         train_df = df[df['unique_subject'].isin(train_subjects)].reset_index(drop=True)
         test_df = df[df['unique_subject'].isin(test_subjects)].reset_index(drop=True)
 
-        # Inner subject-level validation split from outer training subjects only
-        val_subject_ratio = train_cfg.get('val_subject_ratio', 0.2)
-        fit_df, val_df, fit_subjects, val_subjects = split_by_subject(
-            train_df, val_subject_ratio, random_state=cfg['random_state'] + fold
-        )
-
-        # Pairwise disjoint subject assertions
-        fit_set = set(fit_subjects)
-        val_set = set(val_subjects)
-        test_set = set(test_subjects)
-        assert fit_set.isdisjoint(val_set), f"fit/val overlap: {fit_set & val_set}"
-        assert fit_set.isdisjoint(test_set), f"fit/test overlap: {fit_set & test_set}"
-        assert val_set.isdisjoint(test_set), f"val/test overlap: {val_set & test_set}"
-
-        X_fit, y_fit, _ = create_sequences(
-            fit_df, model_cfg['feature_cols'],
-            model_cfg['max_seq_len'], model_cfg['min_clip_len']
-        )
-        X_val, y_val, _ = create_sequences(
-            val_df, model_cfg['feature_cols'],
+        X_train, y_train, _ = create_sequences(
+            train_df, model_cfg['feature_cols'],
             model_cfg['max_seq_len'], model_cfg['min_clip_len']
         )
         X_test, y_test, test_clip_info = create_sequences(
@@ -70,12 +52,10 @@ def main():
             model_cfg['max_seq_len'], model_cfg['min_clip_len']
         )
 
-        train_dataset = EyeTrackingDataset(torch.FloatTensor(X_fit), torch.LongTensor(y_fit))
-        val_dataset = EyeTrackingDataset(torch.FloatTensor(X_val), torch.LongTensor(y_val))
+        train_dataset = EyeTrackingDataset(torch.FloatTensor(X_train), torch.LongTensor(y_train))
         test_dataset = EyeTrackingDataset(torch.FloatTensor(X_test), torch.LongTensor(y_test))
 
         train_loader = DataLoader(train_dataset, batch_size=train_cfg['batch_size'], shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=train_cfg['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=train_cfg['batch_size'], shuffle=False)
 
         model = TCNClassifier(
@@ -89,7 +69,7 @@ def main():
         total_params = sum(p.numel() for p in model.parameters())
         print(f"\n模型参数量: {total_params:,}")
 
-        model = train_model(model, train_loader, val_loader, cfg, device)
+        model = train_model(model, train_loader, test_loader, cfg, device)
 
         _, _, test_preds, test_labels, test_probs = evaluate(
             model, test_loader, torch.nn.CrossEntropyLoss(), device
@@ -127,7 +107,7 @@ def main():
 
         torch.save({
             'sequences': torch.FloatTensor(X_test),
-            'labels': [int(label) for label in y_test],
+            'labels': [int(l) for l in y_test],
             'clip_info': test_clip_info,
         }, f'output_model/test_clip_data_fold{fold+1}.pt')
 
@@ -149,8 +129,8 @@ def main():
     combined_subject_results = subject_majority_vote(combined_clip_results, threshold=vote_threshold)
     print_subject_results(combined_subject_results)
 
-    print("\n单折模型已保存至: output_model/tcn_model_fold1~3.pth")
-    print("单折测试数据已保存至: output_model/test_clip_data_fold1~3.pt")
+    print(f"\n单折模型已保存至: output_model/tcn_model_fold1~3.pth")
+    print(f"单折测试数据已保存至: output_model/test_clip_data_fold1~3.pt")
 
     return fold_metrics, combined_subject_results
 

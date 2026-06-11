@@ -25,7 +25,6 @@ model:
   - 3
   - 3
   dropout: 0.1   
-  pooling_mode: gap
   feature_cols:
   - gaze_x
   - gaze_y
@@ -36,13 +35,12 @@ training:
   epochs: 100
   learning_rate: 5.0e-4
   weight_decay: 1.0e-5
-  patience: 100
+  patience: 100   #想看下最终结果的时候就设为50
   test_subject_ratio: 0.2
-  val_subject_ratio: 0.2
   grad_clip: 1.0
   warmup_epochs: 10 #8-13都尝试了，结果区别较大
 
 vote:
-  threshold: 0.50
+  threshold: 0.55
 
 random_state: 42

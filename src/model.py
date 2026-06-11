@@ -142,12 +142,13 @@ class TCNClassifier(nn.Module):
         x = x.transpose(1, 2)
         _, features = self.tcn.forward_with_intermediates(x, extract_indices=set(self.fusion_levels))
 
-        fusion_outputs = []
+        fused = []
         for feat in features:
             gap = self.gap(feat).squeeze(-1)
             gmp = self.gmp(feat).squeeze(-1)
-            fusion_outputs.append(torch.cat([gap, gmp], dim=1))
+            fused.append(gap)
+            fused.append(gmp)
 
-        out = torch.cat(fusion_outputs, dim=1)
+        out = torch.cat(fused, dim=-1)
         out = self.classifier(out)
         return out
