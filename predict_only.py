@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import pandas as pd
 import torch
 
 from src.config import load_config
@@ -28,6 +27,8 @@ def main():
         num_classes=checkpoint["num_classes"],
         kernel_sizes=checkpoint.get("kernel_sizes", 3),
         dropout=checkpoint["dropout"],
+        pooling_mode=checkpoint.get("pooling_mode", "gap_gmp"),
+        classifier_hidden_size=checkpoint.get("classifier_hidden_size"),
     ).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()

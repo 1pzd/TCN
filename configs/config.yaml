@@ -25,6 +25,7 @@ model:
   - 3
   - 3
   dropout: 0.1   
+  pooling_mode: gap
   feature_cols:
   - gaze_x
   - gaze_y

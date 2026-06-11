@@ -7,7 +7,6 @@
 import os
 import sys
 import json
-import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import roc_auc_score
@@ -45,6 +44,8 @@ def load_fold(fold, device):
         num_classes=checkpoint['num_classes'],
         kernel_sizes=checkpoint.get('kernel_sizes', 3),
         dropout=checkpoint['dropout'],
+        pooling_mode=checkpoint.get('pooling_mode', 'gap_gmp'),
+        classifier_hidden_size=checkpoint.get('classifier_hidden_size'),
     ).to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()

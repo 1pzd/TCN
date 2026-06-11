@@ -40,7 +40,9 @@ def main():
             num_channels=checkpoint['num_channels'],
             num_classes=checkpoint['num_classes'],
             kernel_sizes=checkpoint.get('kernel_sizes', 3),
-            dropout=checkpoint['dropout']
+            dropout=checkpoint['dropout'],
+            pooling_mode=checkpoint.get('pooling_mode', 'gap_gmp'),
+            classifier_hidden_size=checkpoint.get('classifier_hidden_size')
         ).to(device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
@@ -114,12 +116,14 @@ def main():
     header = f"{'group':>15}  {'subj_acc':>9}  {'subj_auc':>9}  {'clip_acc':>9}  {'clip_auc':>9}"
     print(header)
     print('-' * len(header))
+    def fmt(v):
+        return f'{v:.4f}' if pd.notna(v) else '   N/A'
+
     for _, r in results_df.iterrows():
-        fmt = lambda v: f'{v:.4f}' if pd.notna(v) else '   N/A'
         print(f"{r['group']:>15}  {fmt(r['subj_acc']):>9}  {fmt(r['subj_auc']):>9}  "
               f"{fmt(r['clip_acc']):>9}  {fmt(r['clip_auc']):>9}")
 
-    print(f"\n均值 ± 标准差:")
+    print("\n均值 ± 标准差:")
     for col, label in [('subj_acc', 'subject ACC'), ('subj_auc', 'subject AUC'),
                        ('clip_acc', 'clip ACC'),   ('clip_auc', 'clip AUC')]:
         mean_v = results_df[col].mean()
