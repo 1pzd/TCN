@@ -130,3 +130,39 @@ def split_by_subject(df, test_ratio, random_state=42):
     assert len(overlap) == 0, f"Subject泄露! 重叠: {overlap}"
 
     return train_df, test_df, train_subjects, test_subjects
+
+
+def split_inner_val(df, outer_train_subjects, val_ratio=0.2, random_state=42):
+    subjects = df[df['unique_subject'].isin(outer_train_subjects)][
+        ['unique_subject', 'label']
+    ].drop_duplicates().reset_index(drop=True)
+
+    inner_train_subjects = []
+    inner_val_subjects = []
+
+    for label in [0, 1]:
+        group = subjects[subjects['label'] == label]
+        if len(group) == 0:
+            continue
+        n_val = max(1, int(len(group) * val_ratio))
+        if len(group) > 1:
+            n_val = min(n_val, len(group) - 1)
+        val_sampled = group.sample(n=n_val, random_state=random_state)
+        inner_val_subjects.extend(val_sampled['unique_subject'].tolist())
+        train_rest = group[~group['unique_subject'].isin(val_sampled['unique_subject'])]
+        inner_train_subjects.extend(train_rest['unique_subject'].tolist())
+
+    overlap_tv = set(inner_train_subjects) & set(inner_val_subjects)
+    assert len(overlap_tv) == 0, f"Inner split leak! overlap: {overlap_tv}"
+
+    print(f"\nInner split (val_ratio={val_ratio}):")
+    train_info = subjects[subjects['unique_subject'].isin(inner_train_subjects)]
+    val_info = subjects[subjects['unique_subject'].isin(inner_val_subjects)]
+    print(f"  Inner train: {len(inner_train_subjects)} subjects "
+          f"(BJ={len(train_info[train_info['label'] == 1])}, "
+          f"ZJ={len(train_info[train_info['label'] == 0])})")
+    print(f"  Inner val:   {len(inner_val_subjects)} subjects "
+          f"(BJ={len(val_info[val_info['label'] == 1])}, "
+          f"ZJ={len(val_info[val_info['label'] == 0])})")
+
+    return inner_train_subjects, inner_val_subjects

@@ -1,7 +1,0 @@
-﻿Total params: 7,707,812
-Trainable params: 7,707,812
-TemporalConvNet: 3,793,004
-SinusoidalPositionalEncoding: 0
-SelfAttentionPooling: 449
-LevelWeightedFusion: 7,491
-ResidualClassifier: 3,906,868

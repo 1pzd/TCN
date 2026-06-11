@@ -1,1 +1,0 @@
-﻿Input: torch.Size([2, 2688]), Output: torch.Size([2, 2])

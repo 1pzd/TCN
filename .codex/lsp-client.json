@@ -1,8 +1,0 @@
-{
-  "lsp": {
-    "marksman": {
-      "command": ["C:\\Users\\技嘉\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Artempyanykh.Marksman_Microsoft.Winget.Source_8wekyb3d8bbwe\\marksman.exe", "server"],
-      "extensions": [".md", ".markdown"]
-    }
-  }
-}

@@ -1,7 +1,0 @@
-﻿Model params: 7,707,812 total, 7,707,812 trainable
-
-=== Training 2 batches ===
-Batch 1: loss=0.676190, grad_norm=3.389703
-Batch 2: loss=0.709523, grad_norm=3.729887
-
-Training pipeline test PASSED

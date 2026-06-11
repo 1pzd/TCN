@@ -33,7 +33,7 @@ training:
   batch_size: 32
   class_weight: null
   epochs: 100
-  learning_rate: 5.0e-4
+  learning_rate: 0.0005
   weight_decay: 1.0e-5
   patience: 100   #想看下最终结果的时候就设为50
   test_subject_ratio: 0.2
@@ -41,6 +41,6 @@ training:
   warmup_epochs: 10 #8-13都尝试了，结果区别较大
 
 vote:
-  threshold: 0.55
+  threshold: 0.53
 
 random_state: 42
