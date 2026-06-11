@@ -37,6 +37,7 @@ training:
   weight_decay: 1.0e-5
   patience: 100
   test_subject_ratio: 0.2
+  val_subject_ratio: 0.2
   grad_clip: 1.0
   warmup_epochs: 10 #8-13都尝试了，结果区别较大
 

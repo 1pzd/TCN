@@ -58,6 +58,7 @@ d:\code-en\
 | `training` | `weight_decay` | L2 正则化系数 |
 | `training` | `patience` | 早停耐心值（验证准确率不再提升时停止） |
 | `training` | `test_subject_ratio` | 按受试者划分测试集的比例（单次划分时使用） |
+| `training` | `val_subject_ratio` | 每个外层训练 fold 内，再按受试者划分验证集的比例 |
 | `training` | `grad_clip` | 梯度裁剪阈值 |
 | `training` | `warmup_epochs` | 学习率预热轮数 |
 | `training` | `class_weight` | 类别权重（null 表示不使用） |
@@ -155,12 +156,12 @@ model = TCNClassifier(
 | `EyeTrackingDataset` | PyTorch Dataset 封装，适配 DataLoader |
 | `train_epoch(model, loader, optimizer, criterion, device, grad_clip, pbar)` | 单 epoch 训练，含梯度裁剪，返回平均 loss 和准确率 |
 | `evaluate(model, loader, criterion, device)` | 模型评估，返回 loss、准确率、预测值、真实值、概率值 |
-| `train_model(model, train_loader, test_loader, cfg, device)` | **完整训练流程**：AdamW 优化器 + ReduceLROnPlateau 调度 + 学习率预热 + 早停 + 最佳模型保存 |
+| `train_model(model, train_loader, val_loader, cfg, device)` | **完整训练流程**：AdamW 优化器 + ReduceLROnPlateau 调度 + 学习率预热 + 基于验证集早停 + 最佳模型保存 |
 
 **使用示例**：
 ```python
 from src.trainer import train_model, evaluate
-model = train_model(model, train_loader, test_loader, cfg, device)
+model = train_model(model, train_loader, val_loader, cfg, device)
 ```
 
 ---
@@ -246,6 +247,9 @@ subject_results = subject_majority_vote(clip_results, threshold=0.55)
 **作用**：完整训练主流程。
 - 加载配置和数据
 - 按受试者进行 3 折分层划分
+- 每个外层训练 fold 内，再按受试者划分训练/验证集
+- 训练期只用验证集做学习率调度、早停和最佳模型选择
+- 外层 held-out 测试 fold 只在训练完成后评估
 - 每折独立训练一个 TCN 模型
 - 输出 clip 级和受试者级评估结果
 - 保存模型和测试数据到 `output_model/` 目录
