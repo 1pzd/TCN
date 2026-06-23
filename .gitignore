@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 *.pth
 *.pt
+# ARIS-Code local artifacts
+.claude/settings.local.json
+.claude/sessions/
